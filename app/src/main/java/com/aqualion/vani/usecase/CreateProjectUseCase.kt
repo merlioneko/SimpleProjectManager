@@ -6,7 +6,7 @@ import com.aqualion.vani.domain.ProjectRepository
 import jakarta.inject.Inject
 import java.time.LocalDateTime
 
-class CreateNewProjectUseCase @Inject constructor(
+class CreateProjectUseCase @Inject constructor(
     private val projectRepository: ProjectRepository
 ) {
     /**
@@ -23,7 +23,7 @@ class CreateNewProjectUseCase @Inject constructor(
             createdAt = time,
             updatedAt = time
         )
-        projectRepository.saveProjects(listOf(project))
+        projectRepository.addProjects(listOf(project))
     }.onSuccess { Log.d("CreateNewProjectUseCase", "success") }
      .onFailure { Log.d("CreateNewProjectUseCase", "failure: ${it.message}") }
 }

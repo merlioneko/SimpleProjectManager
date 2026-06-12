@@ -16,6 +16,6 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext applicationContext: Context): AppDatabase {
-        return AppDatabaseHelper(applicationContext).getDatabaseInMemory()
+        return AppDatabaseHelper(applicationContext).getDatabase()
     }
 }

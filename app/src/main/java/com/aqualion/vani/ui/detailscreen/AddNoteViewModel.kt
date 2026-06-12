@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Deprecated("no longer needed")
 @HiltViewModel
 class AddNoteViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
@@ -26,7 +27,15 @@ class AddNoteViewModel @Inject constructor(
     fun onAddNote() {
         viewModelScope.launch {
             val projectId = savedStateHandle.get<Int>("projectId") ?: throw IllegalArgumentException("Project ID not found")
-            addNoteUseCase.invoke(listOf(Note(0, _noteName.value, "", projectId, "", "")))
+            addNoteUseCase.invoke(
+                listOf(
+                    Note(
+                        name=_noteName.value,
+                        value="",
+                        projectId=projectId
+                    )
+                )
+            )
         }
     }
 

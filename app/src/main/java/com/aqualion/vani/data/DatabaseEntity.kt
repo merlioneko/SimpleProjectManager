@@ -11,13 +11,19 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
+import androidx.room.Update
 import com.aqualion.vani.domain.IoResult
 import kotlinx.coroutines.flow.Flow
 
+class DataBaseRule {
+    companion object {
+        const val AUTO_INCREMENT = 0
+    }
+}
 
 @Entity(tableName="project")
 data class ProjectEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey(autoGenerate = true) val id: Int = DataBaseRule.AUTO_INCREMENT,
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name= "created_at", defaultValue = "CURRENT_TIMESTAMP") val createdAt: String,
     @ColumnInfo(name= "updated_at", defaultValue = "CURRENT_TIMESTAMP") val updatedAt: String
@@ -33,7 +39,7 @@ data class ProjectEntity(
     )
 ], indices = [androidx.room.Index("project_id")])
 data class NoteEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey(autoGenerate = true) val id: Int = DataBaseRule.AUTO_INCREMENT,
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "value") val value: String,
     @ColumnInfo(name = "project_id") val projectId: Int,
@@ -57,11 +63,17 @@ interface ProjectDao {
     @Query("SELECT * FROM note")
     fun getAllNotes(): Flow<List<NoteEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(projectEntity: ProjectEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(noteEntity: NoteEntity): Long
+
+
+    @Update
+    suspend fun update(projectEntity: ProjectEntity): Int
+    @Update
+    suspend fun update(noteEntity: NoteEntity): Int
+
 
     @Transaction
     @Query("SELECT * FROM project WHERE id = :id")

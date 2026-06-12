@@ -9,23 +9,27 @@ sealed class IoResult<T> {
 
 interface ProjectRepository {
     fun getProjects(): Flow<List<Project>>
-    suspend fun saveProjects(projects: List<Project>): Flow<IoResult<String>>
+    suspend fun addProjects(projects: List<Project>): Long
+    suspend fun updateProject(project: Project): Long
 
     /**
      * プロジェクトを削除する（関係するノートだけは残る）
      */
-    suspend fun deleteProject(id: Int): Flow<IoResult<String>>
+    suspend fun deleteProject(id: Int): Long
 
-    fun getNotes(projectId: Int): Flow<List<Note>>
+    fun getNotesByProject(projectId: Int): Flow<List<Note>>
 
     /**
-     * Add or update a new notes of a project.
+     * Add a new notes of a project.
      */
-    suspend fun saveNotes(notes: List<Note>): Flow<IoResult<String>>
-    suspend fun deleteNote(id: Int): Flow<IoResult<String>>
+    suspend fun addNotes(notes: List<Note>): Long
+    suspend fun updateNotes(note: List<Note>): Long
+
+    suspend fun deleteNote(id: Int): Long
 
     fun getProjectDetail(projectId: Int): Flow<ProjectDetail?>
-    suspend fun saveProjectDetail(projectDetail: ProjectDetail): Flow<IoResult<String>>
+    suspend fun addProjectDetail(projectDetail: ProjectDetail): Long
+    suspend fun updateProjectDetail(projectDetail: ProjectDetail): Long
     fun getNote(id: Int): Flow<Note>
 
 }

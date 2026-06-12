@@ -1,15 +1,16 @@
 package com.aqualion.vani.domain
 
+import com.aqualion.vani.data.DataBaseRule
 import com.aqualion.vani.data.NoteEntity
 import com.aqualion.vani.data.ProjectEntity
 import com.aqualion.vani.data.ProjectDetailEntity
 import java.time.LocalTime
 
 data class Project(
-    val id: Int,
+    val id: Int = DataBaseRule.AUTO_INCREMENT,
     val name: String,
-    val createdAt: String,
-    val updatedAt: String
+    val createdAt: String = LocalTime.now().toString(),
+    val updatedAt: String = LocalTime.now().toString()
 ) {
     init {
         require(name.isNotBlank()) { "Project name cannot be blank" }
@@ -35,12 +36,12 @@ fun ProjectEntity.toDomain(): Project {
 }
 
 data class Note(
-    val id: Int,
+    val id: Int = DataBaseRule.AUTO_INCREMENT,
     val name: String,
     val value: String,
     val projectId: Int,
-    val createdAt: String,
-    val updatedAt: String
+    val createdAt: String = LocalTime.now().toString(),
+    val updatedAt: String = LocalTime.now().toString()
 ) {
 }
 

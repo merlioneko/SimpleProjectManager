@@ -59,7 +59,6 @@ class ProjectRepositoryTestUseCase {
             project = testProject,
             notes = listOf(testNote)
         )
-        projectRepository.saveProjectDetail(testDetail)
     }
 
     suspend fun getRecord() {

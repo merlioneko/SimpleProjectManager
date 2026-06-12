@@ -21,7 +21,8 @@ class NoteViewModel @Inject constructor(
     private val getNoteUseCase: GetNoteUseCase,
     private val saveNotesUseCase: SaveNotesUseCase
 ): ViewModel() {
-    private val _noteUiModel = MutableStateFlow(NoteUiModel(-1, "", "", 0, "", ""))
+    private val emptyNote = NoteUiModel(-1, "", "", 0, "", "")
+    private val _noteUiModel = MutableStateFlow(emptyNote)
     val noteUiModel = _noteUiModel.asStateFlow()
 
     private val _errorMessage = MutableStateFlow("")
@@ -30,7 +31,7 @@ class NoteViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             runCatching {
-                if (_noteUiModel.value.id == -1) throw IllegalArgumentException("Note id is not set")
+                if (_noteUiModel.value.id == emptyNote.id) throw IllegalArgumentException("Note id is not set")
                 getNoteUseCase.invoke(_noteUiModel.value.id).onSuccess {
                     it.collect { note ->
                         _noteUiModel.update {note.asUiState() }

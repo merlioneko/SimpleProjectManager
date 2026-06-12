@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aqualion.vani.ui.ProjectUiModel
 import com.aqualion.vani.ui.asUiState
-import com.aqualion.vani.usecase.CreateProjectUseCaseTest
 import com.aqualion.vani.usecase.DeleteProjectUseCase
 import com.aqualion.vani.usecase.GetAllProjectsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +29,6 @@ data class ProjectListUiState(
 
 @HiltViewModel
 class ProjectListViewModel @Inject constructor(
-    private val projectTest: CreateProjectUseCaseTest,
     private val getAllProjectsUseCase: GetAllProjectsUseCase,
     private val deleteProjectUseCase: DeleteProjectUseCase
 ): ViewModel()  {
@@ -38,9 +36,6 @@ class ProjectListViewModel @Inject constructor(
     val projectListUiState: StateFlow<ProjectListUiState> = _projectListUiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            projectTest.execute()
-        }
         refreshProjects()
     }
 

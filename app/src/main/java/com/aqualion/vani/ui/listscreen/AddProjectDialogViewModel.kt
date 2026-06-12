@@ -2,7 +2,7 @@ package com.aqualion.vani.ui.listscreen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aqualion.vani.usecase.CreateNewProjectUseCase
+import com.aqualion.vani.usecase.CreateProjectUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class AddProjectDialogViewModel @Inject constructor(
-    private val createProjectUseCase: CreateNewProjectUseCase
+    private val createProjectUseCase: CreateProjectUseCase
 ) : ViewModel() {
     private val _projectName = MutableStateFlow("")
     val projectName = _projectName.asStateFlow()

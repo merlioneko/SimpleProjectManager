@@ -1,8 +1,6 @@
 package com.aqualion.vani.data
 
-import android.util.Log
 import androidx.room.withTransaction
-import com.aqualion.vani.domain.IoResult
 import com.aqualion.vani.domain.Note
 import com.aqualion.vani.domain.Project
 import com.aqualion.vani.domain.ProjectDetail
@@ -12,7 +10,6 @@ import com.aqualion.vani.domain.toEntity
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -27,43 +24,52 @@ class ProjectRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun saveProjects(projects: List<Project>): Flow<IoResult<String>> = withContext(Dispatchers.IO) {
+    override suspend fun addProjects(projects: List<Project>): Long = withContext(Dispatchers.IO) {
         appDatabase.withTransaction {
-            projects.forEach {
-                projectDao.insert(it.toEntity())
-            }
+            projects.count {
+                projectDao.insert(it.toEntity()) != 0L
+            }.toLong()
         }
-        Log.d("ProjectRepositoryImpl", "saved projects: $projects")
-        return@withContext flowOf(IoResult.Success("Success"))
     }
 
-    override suspend fun deleteProject(id: Int): Flow<IoResult<String>> = withContext(Dispatchers.IO) {
+    override suspend fun updateProject(project: Project): Long = withContext(Dispatchers.IO) {
+        appDatabase.withTransaction {
+            projectDao.update(project.toEntity())
+        }.toLong()
+    }
+
+    override suspend fun deleteProject(id: Int): Long = withContext(Dispatchers.IO) {
         appDatabase.withTransaction {
             projectDao.deleteProject(id)
-        }
-        return@withContext flowOf(IoResult.Success("Success"))
+        }.toLong()
     }
 
-    override fun getNotes(projectId: Int): Flow<List<Note>> {
+    override fun getNotesByProject(projectId: Int): Flow<List<Note>> {
         return projectDao.getAllNotes().map { entities ->
             entities.map { it.toDomain() }
         }
     }
 
-    override suspend fun saveNotes(notes: List<Note>): Flow<IoResult<String>> = withContext(Dispatchers.IO) {
+    override suspend fun addNotes(notes: List<Note>): Long = withContext(Dispatchers.IO) {
         appDatabase.withTransaction {
-            notes.forEach {
-                projectDao.insert(it.toEntity())
-            }
+            notes.count {
+                projectDao.insert(it.toEntity()) != 0L
+            }.toLong()
         }
-        return@withContext flowOf(IoResult.Success("Success"))
     }
 
-    override suspend fun deleteNote(id: Int): Flow<IoResult<String>> = withContext(Dispatchers.IO) {
+    override suspend fun updateNotes(note: List<Note>): Long = withContext(Dispatchers.IO) {
+        appDatabase.withTransaction {
+            note.count {
+                projectDao.update(it.toEntity()) != 0
+            }.toLong()
+        }
+    }
+
+    override suspend fun deleteNote(id: Int): Long = withContext(Dispatchers.IO) {
         appDatabase.withTransaction {
             projectDao.deleteNote(id)
-        }
-        return@withContext flowOf(IoResult.Success("Success"))
+        }.toLong()
     }
 
     override fun getProjectDetail(projectId: Int): Flow<ProjectDetail?> {
@@ -72,17 +78,65 @@ class ProjectRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun saveProjectDetail(projectDetail: ProjectDetail): Flow<IoResult<String>> = withContext(Dispatchers.IO) {
+    override suspend fun addProjectDetail(projectDetail: ProjectDetail): Long = withContext(Dispatchers.IO) {
         val project = projectDetail.project.toEntity()
         val notes = projectDetail.notes.map { it.toEntity() }
+        val newNotes = notes.filter { it.id == DataBaseRule.AUTO_INCREMENT }
+        val updatedNotes = notes.filter { it.id != DataBaseRule.AUTO_INCREMENT }
 
         appDatabase.withTransaction {
-            projectDao.insert(project)
-            notes.forEach {
-                projectDao.insert(it)
+            if (projectDao.insert(project) == 0L) {
+                throw IllegalArgumentException("Failed to insert project")
             }
+            val newNoteSuccessCount = newNotes.count {
+                projectDao.insert(it) != 0L
+            }.toLong()
+
+            if (newNoteSuccessCount != newNotes.size.toLong()) {
+                throw IllegalArgumentException("Failed to insert notes")
+            }
+
+            val updateNoteSuccessCount = updatedNotes.count {
+                projectDao.update(it) != 0
+            }.toLong()
+            if (updateNoteSuccessCount != updatedNotes.size.toLong()) {
+                throw IllegalArgumentException("Failed to update notes")
+            }
+            return@withTransaction newNoteSuccessCount + updateNoteSuccessCount
         }
-        return@withContext flowOf(IoResult.Success("Success"))
+    }
+
+    /**
+     * ProjectDetailを更新する。
+     * return 成功：更新した行数、失敗：例外
+     */
+    override suspend fun updateProjectDetail(projectDetail: ProjectDetail): Long = withContext(Dispatchers.IO) {
+        val project = projectDetail.project.toEntity()
+        val notes = projectDetail.notes.map { it.toEntity() }
+        val newNotes = notes.filter { it.id == DataBaseRule.AUTO_INCREMENT }
+        val updatedNotes = notes.filter { it.id != DataBaseRule.AUTO_INCREMENT }
+
+        appDatabase.withTransaction {
+            if (projectDao.update(project) == 0) {
+                throw IllegalArgumentException("Failed to insert project")
+            }
+            val newNoteSuccessCount = newNotes.count {
+                projectDao.insert(it) != 0L
+            }.toLong()
+
+            if (newNoteSuccessCount != newNotes.size.toLong()) {
+                throw IllegalArgumentException("Failed to insert notes")
+            }
+
+            val updateNoteSuccessCount = updatedNotes.count {
+                projectDao.update(it) != 0
+            }.toLong()
+            if (updateNoteSuccessCount != updatedNotes.size.toLong()) {
+                throw IllegalArgumentException("Failed to update notes")
+            }
+            return@withTransaction newNoteSuccessCount + updateNoteSuccessCount
+        }
+
     }
 
     override fun getNote(id: Int): Flow<Note> {

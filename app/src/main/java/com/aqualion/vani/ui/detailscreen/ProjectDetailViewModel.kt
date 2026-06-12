@@ -13,6 +13,7 @@ import com.aqualion.vani.usecase.DeleteNotesUseCase
 import com.aqualion.vani.usecase.GetProjectDetailUseCase
 import com.aqualion.vani.usecase.SaveNotesUseCase
 import com.aqualion.vani.usecase.SaveProjectDetailUseCase
+import com.aqualion.vani.usecase.SaveProjectUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalTime
 
 enum class DialogPurpose {
     EDIT_NOTE,
@@ -27,7 +29,7 @@ enum class DialogPurpose {
 }
 
 data class ProjectDetailUiState(
-    val projectId: Int = 0,
+    val projectId: Int,
     val projectName: String = "",
     val projectCreatedAt: String = "",
     val notes: List<NoteUiModel> = emptyList(),
@@ -42,11 +44,13 @@ data class ProjectDetailUiState(
 class ProjectDetailViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val getProjectDetailUseCase: GetProjectDetailUseCase,
+    private val saveProjectUseCase: SaveProjectUseCase,
     private val saveNotesUseCase: SaveNotesUseCase,
     private val deleteNotesUseCase: DeleteNotesUseCase,
     private val saveProjectDetailUseCase: SaveProjectDetailUseCase
 ): ViewModel() {
-    private val _projectDetailUiState = MutableStateFlow(ProjectDetailUiState())
+    private val emptyDetail = ProjectDetailUiState(-1)
+    private val _projectDetailUiState = MutableStateFlow(emptyDetail)
     val projectDetailUiState: StateFlow<ProjectDetailUiState> = _projectDetailUiState.asStateFlow()
 
     init {
@@ -100,8 +104,22 @@ class ProjectDetailViewModel @Inject constructor(
         onEdited()
     }
 
+    fun onSaveProjectName() {
+        val project = Project(
+            _projectDetailUiState.value.projectId,
+            _projectDetailUiState.value.projectName,
+            _projectDetailUiState.value.projectCreatedAt,
+            LocalTime.now().toString()
+        )
+        viewModelScope.launch {
+            saveProjectUseCase(project)
+        }
+        _projectDetailUiState.update { it.copy(isEdited = false) }
+        refreshDetail()
+    }
+
     fun onRequestAddNewNote() {
-        val newNote = NoteUiModel(0, "", "", 0, "", "")
+        val newNote = NoteUiModel(name="", value="", projectId = _projectDetailUiState.value.projectId)
         _projectDetailUiState.update { it.copy(newNote = newNote) }
     }
 
@@ -122,10 +140,7 @@ class ProjectDetailViewModel @Inject constructor(
         viewModelScope.launch {
             saveNotesUseCase(
                 listOf(
-                    Note(0, noteName, "",
-                        _projectDetailUiState.value.projectId,
-                        "", ""
-                    )
+                    Note(name=noteName, value= "", projectId = _projectDetailUiState.value.projectId,)
                 )
             )
         }
@@ -163,9 +178,8 @@ class ProjectDetailViewModel @Inject constructor(
         val project = Project(
             _projectDetailUiState.value.projectId,
             _projectDetailUiState.value.projectName,
-            _projectDetailUiState.value.projectCreatedAt,
-            "")
-        val notes = _projectDetailUiState.value.notes.map { it -> Note(it.id, it.name, it.value, it.projectId, it.createdAt, it.updatedAt)}
+            _projectDetailUiState.value.projectCreatedAt)
+        val notes = _projectDetailUiState.value.notes.map { Note(it.id, it.name, it.value, it.projectId, it.createdAt, it.updatedAt)}
         val projectDetail = ProjectDetail(project, notes)
         viewModelScope.launch {
             saveProjectDetailUseCase(projectDetail)
