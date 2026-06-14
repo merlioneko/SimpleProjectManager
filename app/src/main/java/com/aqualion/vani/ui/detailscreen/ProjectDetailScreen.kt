@@ -1,5 +1,6 @@
 package com.aqualion.vani.ui.detailscreen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -198,6 +199,7 @@ fun NewNoteItem(modifier: Modifier = Modifier,
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NoteItem(modifier: Modifier = Modifier,
              note: NoteUiModel,
@@ -236,6 +238,7 @@ fun DeleteNoteDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteDialog(viewModel: NoteViewModel = hiltViewModel(), selectedNote: NoteUiModel?, onDismiss: () -> Unit) {
     if (selectedNote == null) {
@@ -304,6 +307,7 @@ fun ProjectDetailContentPreview() {
     VaniTheme {
         ProjectDetailContent(
             uiState = ProjectDetailUiState(
+                projectId = 1,
                 projectName = "Project 1",
                 notes = listOf(
                     NoteUiModel(

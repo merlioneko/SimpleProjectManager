@@ -1,6 +1,7 @@
 package com.aqualion.vani.ui.listscreen
 
 import android.util.Log
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -92,6 +93,7 @@ fun ProjectListScreenContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProjectCard(modifier: Modifier = Modifier,
                 project: ProjectUiModel,
