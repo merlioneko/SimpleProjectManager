@@ -97,6 +97,7 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
     when(uiState.showDialog) {
         DialogPurpose.EDIT_NOTE -> NoteDialog(selectedNote = selectedNote,
             onDismiss = {
+                viewModel.onSave()
                 viewModel.refreshDetail()
             }
         )
@@ -294,6 +295,14 @@ fun NoteDialog(viewModel: NoteViewModel = hiltViewModel(), selectedNote: NoteUiM
                         unfocusedIndicatorColor = Color.Transparent
                     )
                 )
+                HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                if (isEdited) {
+                    Text(
+                        text = "※編集中",
+                        modifier = Modifier.weight(1f),
+                        overflow = TextOverflow.StartEllipsis
+                    )
+                }
             }
         }
     }

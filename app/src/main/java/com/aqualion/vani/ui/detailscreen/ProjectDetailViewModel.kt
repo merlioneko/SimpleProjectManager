@@ -16,12 +16,17 @@ import com.aqualion.vani.usecase.SaveProjectDetailUseCase
 import com.aqualion.vani.usecase.SaveProjectUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalTime
+import kotlin.time.Duration.Companion.milliseconds
 
 enum class DialogPurpose {
     EDIT_NOTE,
@@ -86,6 +91,19 @@ class ProjectDetailViewModel @Inject constructor(
                 )
             }
         }
+
+        // Auto-save every 1 minute if edited
+        flow {
+            while (true) {
+                delay(60_000.milliseconds)
+                emit(Unit)
+            }
+        }.onEach {
+            if (_projectDetailUiState.value.isEdited) {
+                onSave()
+                Log.d("ProjectDetailViewModel", "Auto-saved")
+            }
+        }.launchIn(viewModelScope)
     }
 
     fun refreshDetail() {
