@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -60,38 +61,40 @@ class ProjectDetailViewModel @Inject constructor(
     init {
         val projectId = savedStateHandle.get<Int>("projectId")
         if (projectId != null) {
-            viewModelScope.launch {
-                initDetail(projectId).onFailure { e ->
-                    _projectDetailUiState.update { it.copy(errorMessage = e.message) }
-                }.onSuccess {
-                    setAutoSave()
-                }
-            }
+            observeDetail(projectId)
+            setAutoSave()
         }
     }
 
     /**
-     * プロジェクト詳細を再取得する
+     * プロジェクト詳細を継続購読する。
+     * Room の Flow を購読しているので、ノート保存・追加・削除などで
+     * DB が変われば自動的に最新の値で UI が更新される（手動の再取得は不要）。
      * @param projectId プロジェクトID
      */
-    private suspend fun initDetail(projectId: Int) = runCatching {
-        getProjectDetailUseCase(projectId).onSuccess { projectDetail ->
-            if (projectDetail == null) {
-                _projectDetailUiState.update { it.copy(errorMessage = "Project not found") }
-                throw IllegalArgumentException("Project not found")
-            }
+    private fun observeDetail(projectId: Int) {
+        getProjectDetailUseCase(projectId)
+            .onEach { projectDetail ->
+                if (projectDetail == null) {
+                    _projectDetailUiState.update { it.copy(errorMessage = "Project not found") }
+                    return@onEach
+                }
 
-            _projectDetailUiState.update {
-                it.copy(
-                    projectId = projectDetail.project.id,
-                    projectName = projectDetail.project.name,
-                    notes = projectDetail.notes.asUiState(),
-                    showDialog = null,
-                    isLoading = false,
-                    errorMessage = null
-                )
+                _projectDetailUiState.update { current ->
+                    current.copy(
+                        projectId = projectDetail.project.id,
+                        // プロジェクト名を編集中はユーザー入力を優先し、DB値で上書きしない
+                        projectName = if (current.isEdited) current.projectName else projectDetail.project.name,
+                        projectCreatedAt = projectDetail.project.createdAt,
+                        notes = projectDetail.notes.asUiState(),
+                        isLoading = false
+                    )
+                }
             }
-        }
+            .catch { e ->
+                _projectDetailUiState.update { it.copy(errorMessage = e.message) }
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun setAutoSave() {
@@ -108,14 +111,12 @@ class ProjectDetailViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
-    fun refreshDetail() {
-        viewModelScope.launch {
-            val projectId = _projectDetailUiState.value.projectId
-            initDetail(projectId).onSuccess {
-                setAutoSave()
-            }
-        }
-
+    /**
+     * ダイアログを閉じる。ノート一覧は Flow で自動更新されるため、
+     * ここでは表示中のダイアログ状態を閉じるだけでよい。
+     */
+    fun onDismissDialog() {
+        _projectDetailUiState.update { it.copy(showDialog = null) }
     }
 
     fun onError(message: String) {
@@ -183,7 +184,6 @@ class ProjectDetailViewModel @Inject constructor(
         viewModelScope.launch {
             deleteNotesUseCase(note.id)
         }
-        refreshDetail()
     }
 
     fun onSave() {
@@ -195,6 +195,5 @@ class ProjectDetailViewModel @Inject constructor(
             saveProjectUseCase(project)
         }
         _projectDetailUiState.update { it.copy(isEdited = false) }
-        refreshDetail()
     }
 }

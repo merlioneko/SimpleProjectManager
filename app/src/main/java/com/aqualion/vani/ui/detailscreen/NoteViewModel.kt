@@ -27,8 +27,7 @@ data class NoteUiState(
     val value: String = "",
     val projectId: Int = 0,
     val createdAt: String = "",
-    val errorMessage: String? = null,
-    val isEdited: Boolean = false
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -98,10 +97,10 @@ class NoteViewModel @Inject constructor(
     private val _isEdited = MutableStateFlow(false)
     val isEdited = _isEdited.asStateFlow()
     fun onEdited() {
-        _isEdited.value = true
+        _isEdited.update { true }
     }
     fun initEditState() {
-        _isEdited.value = false
+        _isEdited.update { false }
     }
 
     fun onValueChange(value: String) {
@@ -113,8 +112,6 @@ class NoteViewModel @Inject constructor(
         _noteUiState.update {it.copy(name = name)}
         onEdited()
     }
-
-    // TODO: 離散的な保存。いずれ修正する
 
     fun onSave() {
         val state = _noteUiState.value

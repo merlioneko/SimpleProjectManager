@@ -61,10 +61,7 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
         uiState = uiState,
         onNewNoteRequired = viewModel::onRequestAddNewNote,
         onNewNoteNameChanged = viewModel::onChangedNewNoteName,
-        onAddNote = {
-            viewModel.onAddNote(it)
-            viewModel.refreshDetail()
-        },
+        onAddNote = viewModel::onAddNote,
         onProjectNameEdited = viewModel::onProjectNameChanged,
         onNoteSelected = viewModel::onNoteSelected,
         onLongPress = viewModel::onRequestDeleteNote
@@ -83,12 +80,12 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
         DialogPurpose.EDIT_NOTE -> NoteDialog(
             selectedNote = selectedNote,
             onSaved = viewModel::onSave,
-            onDismiss = viewModel::refreshDetail,
+            onDismiss = viewModel::onDismissDialog,
             onError = viewModel::onError
         )
         DialogPurpose.DELETE_NOTE -> DeleteNoteDialog(
             onConfirm = { viewModel.onDeleteNote(selectedNote!!) },
-            onDismiss = viewModel::refreshDetail
+            onDismiss = viewModel::onDismissDialog
         )
         else -> {}
     }
@@ -99,11 +96,8 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
         else -> {
             ErrorDialog(
                 message=uiState.errorMessage?:"Unknown error",
-                onConfirm = {
-                    viewModel.onInitError()
-                    viewModel.refreshDetail()
-                },
-                onDismiss = { viewModel.onInitError() }
+                onConfirm = viewModel::onInitError,
+                onDismiss = viewModel::onInitError
             )
         }
     }
@@ -251,110 +245,7 @@ fun DeleteNoteDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun NoteDialog(
-    viewModel: NoteViewModel = hiltViewModel(), selectedNote: NoteUiModel?,
-    onSaved: () -> Unit = {}, onDismiss: () -> Unit, onError: (String) -> Unit
-) {
-    if (selectedNote == null) {
-        onError("No note selected")
-        onDismiss()
-        return
-    }
 
-    val uiState by viewModel.noteUiState.collectAsStateWithLifecycle()
-    val isEdited by viewModel.isEdited.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        viewModel.initEditState()
-        viewModel.onInit(selectedNote.id)
-    }
-
-    Dialog(
-        onDismissRequest = {
-            if (isEdited) {
-                viewModel.onSave()
-                onSaved()
-            }
-            onDismiss()
-        },
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
-    ) {
-        NoteDetailContent(
-            uiState=uiState,
-            onNameEdited = viewModel::onNameChanged,
-            onValueChange = viewModel::onValueChange,
-            onError = viewModel::onError
-        )
-    }
-
-    when(uiState.errorMessage) {
-        null -> {}
-        else -> {
-            ErrorDialog(
-                message=uiState.errorMessage ?: "Unknown error",
-                onConfirm = {
-                    viewModel.initError()
-                    onDismiss()
-                },
-                onDismiss = { viewModel.initError() }
-            )
-        }
-    }
-}
-
-@Composable
-fun NoteDetailContent(uiState: NoteUiState?, onNameEdited: (String) -> Unit, onValueChange: (String) -> Unit, onError: (String) -> Unit = {}) {
-    if (uiState == null) {
-        onError("Note is not set")
-        return
-    }
-    Scaffold(
-        topBar = { NameTopAppBar(modifier=Modifier, name = uiState.name, size=18, onNameEdited = onNameEdited) },
-    ) {innerPadding ->
-        val focusRequester = remember { FocusRequester() }
-        val scrollState = rememberScrollState()
-        val coroutineScope = rememberCoroutineScope()
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
-        Column(
-            modifier=Modifier.padding(innerPadding)
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .clickable { focusRequester.requestFocus() }
-        ) {
-            TextField(
-                modifier=Modifier.padding(innerPadding)
-                    .fillMaxSize()
-                    .bringIntoViewRequester(bringIntoViewRequester)
-                    .focusRequester(focusRequester)
-                    .onFocusChanged { focusState ->
-                        if (focusState.isFocused) {
-                            coroutineScope.launch {
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    },
-                value=uiState.value,
-                onValueChange = onValueChange,
-                singleLine = false,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                )
-            )
-            HorizontalDivider(modifier = Modifier.fillMaxWidth())
-            if (uiState.isEdited) {
-                Text(
-                    text = "※編集中",
-                    modifier = Modifier.wrapContentHeight(),
-                    overflow = TextOverflow.StartEllipsis
-                )
-            }
-        }
-    }
-}
 
 
 
