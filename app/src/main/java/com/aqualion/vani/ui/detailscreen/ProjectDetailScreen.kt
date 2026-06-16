@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -74,44 +75,55 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
             if (uiState.isEdited) {
                 viewModel.onSave()
             }
-            viewModel.refreshDetail()
         }
     }
+
+    val selectedNote by viewModel.selectedNote.collectAsStateWithLifecycle()
+    when(uiState.showDialog) {
+        DialogPurpose.EDIT_NOTE -> NoteDialog(
+            selectedNote = selectedNote,
+            onSaved = viewModel::onSave,
+            onDismiss = viewModel::refreshDetail,
+            onError = viewModel::onError
+        )
+        DialogPurpose.DELETE_NOTE -> DeleteNoteDialog(
+            onConfirm = { viewModel.onDeleteNote(selectedNote!!) },
+            onDismiss = viewModel::refreshDetail
+        )
+        else -> {}
+    }
+
 
     when(uiState.errorMessage) {
         null -> {}
         else -> {
-            AlertDialog(
-                title = { Text(text = "Error") },
-                text = { Text(text = uiState.errorMessage?: "Unknown error") },
-                onDismissRequest = viewModel::onInitError,
-                confirmButton = {
-                    Button(onClick = {
-                        viewModel.onInitError()
-                        viewModel.refreshDetail()
-                    }) { Text("Reload") }},
+            ErrorDialog(
+                message=uiState.errorMessage?:"Unknown error",
+                onConfirm = {
+                    viewModel.onInitError()
+                    viewModel.refreshDetail()
+                },
+                onDismiss = { viewModel.onInitError() }
             )
         }
     }
-    val selectedNote by viewModel.selectedNote.collectAsStateWithLifecycle()
-    when(uiState.showDialog) {
-        DialogPurpose.EDIT_NOTE -> NoteDialog(selectedNote = selectedNote,
-            onDismiss = {
-                viewModel.onSave()
-                viewModel.refreshDetail()
-            }
-        )
-        DialogPurpose.DELETE_NOTE -> DeleteNoteDialog(
-            onConfirm = { viewModel.onDeleteNote(selectedNote!!) },
-            onDismiss = { viewModel.refreshDetail() }
-        )
-        else -> {}
-    }
+
+}
+
+@Composable
+fun ErrorDialog(message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        title = { Text(text = "Error") },
+        text = { Text(text = message) },
+        onDismissRequest = onDismiss,
+        confirmButton = { Button(onClick = onConfirm) { Text("Reload") }},
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NameTopAppBar(modifier: Modifier = Modifier, name: String, size: Int = 24, onNameEdited: (String) -> Unit = {}) {
+fun NameTopAppBar(modifier: Modifier = Modifier,
+                  name: String, size: Int = 24, onNameEdited: (String) -> Unit = {}) {
     TopAppBar(
         modifier=modifier.fillMaxWidth(),
         title= {
@@ -241,68 +253,104 @@ fun DeleteNoteDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NoteDialog(viewModel: NoteViewModel = hiltViewModel(), selectedNote: NoteUiModel?, onDismiss: () -> Unit) {
+fun NoteDialog(
+    viewModel: NoteViewModel = hiltViewModel(), selectedNote: NoteUiModel?,
+    onSaved: () -> Unit = {}, onDismiss: () -> Unit, onError: (String) -> Unit
+) {
     if (selectedNote == null) {
+        onError("No note selected")
         onDismiss()
-    }
-    LaunchedEffect(Unit) {
-        viewModel.onInit(selectedNote!!)
+        return
     }
 
-    val uiState by viewModel.noteUiModel.collectAsStateWithLifecycle()
+    val uiState by viewModel.noteUiState.collectAsStateWithLifecycle()
     val isEdited by viewModel.isEdited.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        viewModel.initEditState()
+        viewModel.onInit(selectedNote.id)
+    }
+
     Dialog(
         onDismissRequest = {
             if (isEdited) {
                 viewModel.onSave()
+                onSaved()
             }
             onDismiss()
-            },
+        },
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
-        Scaffold(
-            topBar = { NameTopAppBar(modifier=Modifier, name = uiState.name, size=18, onNameEdited = viewModel::onNameChanged) },
-        ) {innerPadding ->
-            val focusRequester = remember { FocusRequester() }
+        NoteDetailContent(
+            uiState=uiState,
+            onNameEdited = viewModel::onNameChanged,
+            onValueChange = viewModel::onValueChange,
+            onError = viewModel::onError
+        )
+    }
 
-            val scrollState = rememberScrollState()
-            val coroutineScope = rememberCoroutineScope()
-            val bringIntoViewRequester = remember { BringIntoViewRequester() }
-            Column(modifier=Modifier.padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .clickable { focusRequester.requestFocus() }
-                ) {
-                TextField(
-                    modifier=Modifier.padding(innerPadding)
-                        .fillMaxSize()
-                        .bringIntoViewRequester(bringIntoViewRequester)
-                        .focusRequester(focusRequester)
-                        .onFocusChanged { focusState ->
-                            if (focusState.isFocused) {
-                                coroutineScope.launch {
-                                    bringIntoViewRequester.bringIntoView()
-                                }
+    when(uiState.errorMessage) {
+        null -> {}
+        else -> {
+            ErrorDialog(
+                message=uiState.errorMessage ?: "Unknown error",
+                onConfirm = {
+                    viewModel.initError()
+                    onDismiss()
+                },
+                onDismiss = { viewModel.initError() }
+            )
+        }
+    }
+}
+
+@Composable
+fun NoteDetailContent(uiState: NoteUiState?, onNameEdited: (String) -> Unit, onValueChange: (String) -> Unit, onError: (String) -> Unit = {}) {
+    if (uiState == null) {
+        onError("Note is not set")
+        return
+    }
+    Scaffold(
+        topBar = { NameTopAppBar(modifier=Modifier, name = uiState.name, size=18, onNameEdited = onNameEdited) },
+    ) {innerPadding ->
+        val focusRequester = remember { FocusRequester() }
+        val scrollState = rememberScrollState()
+        val coroutineScope = rememberCoroutineScope()
+        val bringIntoViewRequester = remember { BringIntoViewRequester() }
+        Column(
+            modifier=Modifier.padding(innerPadding)
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .clickable { focusRequester.requestFocus() }
+        ) {
+            TextField(
+                modifier=Modifier.padding(innerPadding)
+                    .fillMaxSize()
+                    .bringIntoViewRequester(bringIntoViewRequester)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            coroutineScope.launch {
+                                bringIntoViewRequester.bringIntoView()
                             }
-                        },
-                    value=uiState.value,
-                    onValueChange = viewModel::onValueChange,
-                    singleLine = false,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    )
+                        }
+                    },
+                value=uiState.value,
+                onValueChange = onValueChange,
+                singleLine = false,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
                 )
-                HorizontalDivider(modifier = Modifier.fillMaxWidth())
-                if (isEdited) {
-                    Text(
-                        text = "※編集中",
-                        modifier = Modifier.weight(1f),
-                        overflow = TextOverflow.StartEllipsis
-                    )
-                }
+            )
+            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            if (uiState.isEdited) {
+                Text(
+                    text = "※編集中",
+                    modifier = Modifier.wrapContentHeight(),
+                    overflow = TextOverflow.StartEllipsis
+                )
             }
         }
     }

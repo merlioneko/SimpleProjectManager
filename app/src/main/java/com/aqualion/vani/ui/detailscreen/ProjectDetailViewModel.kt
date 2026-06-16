@@ -51,8 +51,7 @@ class ProjectDetailViewModel @Inject constructor(
     private val getProjectDetailUseCase: GetProjectDetailUseCase,
     private val saveProjectUseCase: SaveProjectUseCase,
     private val saveNotesUseCase: SaveNotesUseCase,
-    private val deleteNotesUseCase: DeleteNotesUseCase,
-    private val saveProjectDetailUseCase: SaveProjectDetailUseCase
+    private val deleteNotesUseCase: DeleteNotesUseCase
 ): ViewModel() {
     private val emptyDetail = ProjectDetailUiState(-1)
     private val _projectDetailUiState = MutableStateFlow(emptyDetail)
@@ -64,6 +63,8 @@ class ProjectDetailViewModel @Inject constructor(
             viewModelScope.launch {
                 initDetail(projectId).onFailure { e ->
                     _projectDetailUiState.update { it.copy(errorMessage = e.message) }
+                }.onSuccess {
+                    setAutoSave()
                 }
             }
         }
@@ -73,15 +74,15 @@ class ProjectDetailViewModel @Inject constructor(
      * プロジェクト詳細を再取得する
      * @param projectId プロジェクトID
      */
-    private suspend fun initDetail(projectId: Int): Result<Unit> = runCatching {
+    private suspend fun initDetail(projectId: Int) = runCatching {
         getProjectDetailUseCase(projectId).onSuccess { projectDetail ->
             if (projectDetail == null) {
-                _projectDetailUiState.update { it.copy(isLoading = false) }
+                _projectDetailUiState.update { it.copy(errorMessage = "Project not found") }
                 throw IllegalArgumentException("Project not found")
             }
 
-            _projectDetailUiState.update { uiState ->
-                uiState.copy(
+            _projectDetailUiState.update {
+                it.copy(
                     projectId = projectDetail.project.id,
                     projectName = projectDetail.project.name,
                     notes = projectDetail.notes.asUiState(),
@@ -91,8 +92,9 @@ class ProjectDetailViewModel @Inject constructor(
                 )
             }
         }
+    }
 
-        // Auto-save every 1 minute if edited
+    private fun setAutoSave() {
         flow {
             while (true) {
                 delay(60_000.milliseconds)
@@ -109,10 +111,16 @@ class ProjectDetailViewModel @Inject constructor(
     fun refreshDetail() {
         viewModelScope.launch {
             val projectId = _projectDetailUiState.value.projectId
-            initDetail(projectId)
+            initDetail(projectId).onSuccess {
+                setAutoSave()
+            }
         }
+
     }
 
+    fun onError(message: String) {
+        _projectDetailUiState.update { it.copy(errorMessage = message) }
+    }
     fun onInitError() {
         _projectDetailUiState.update { it.copy(errorMessage = null) }
     }
@@ -120,20 +128,6 @@ class ProjectDetailViewModel @Inject constructor(
     fun onProjectNameChanged(name: String) {
         _projectDetailUiState.update { it.copy(projectName = name) }
         onEdited()
-    }
-
-    fun onSaveProjectName() {
-        val project = Project(
-            _projectDetailUiState.value.projectId,
-            _projectDetailUiState.value.projectName,
-            _projectDetailUiState.value.projectCreatedAt,
-            LocalTime.now().toString()
-        )
-        viewModelScope.launch {
-            saveProjectUseCase(project)
-        }
-        _projectDetailUiState.update { it.copy(isEdited = false) }
-        refreshDetail()
     }
 
     fun onRequestAddNewNote() {
@@ -169,8 +163,8 @@ class ProjectDetailViewModel @Inject constructor(
     private val _selectedNote = MutableStateFlow<NoteUiModel?>(null)
     val selectedNote = _selectedNote.asStateFlow()
     fun onNoteSelected(note: NoteUiModel) {
+        Log.d("onNoteSelected", "${note.id}")
         _selectedNote.update { note }
-        savedStateHandle["selectedNoteId"] = note.id
         _projectDetailUiState.update { it.copy(showDialog = DialogPurpose.EDIT_NOTE) }
     }
 
@@ -197,10 +191,8 @@ class ProjectDetailViewModel @Inject constructor(
             _projectDetailUiState.value.projectId,
             _projectDetailUiState.value.projectName,
             _projectDetailUiState.value.projectCreatedAt)
-        val notes = _projectDetailUiState.value.notes.map { Note(it.id, it.name, it.value, it.projectId, it.createdAt, it.updatedAt)}
-        val projectDetail = ProjectDetail(project, notes)
         viewModelScope.launch {
-            saveProjectDetailUseCase(projectDetail)
+            saveProjectUseCase(project)
         }
         _projectDetailUiState.update { it.copy(isEdited = false) }
         refreshDetail()

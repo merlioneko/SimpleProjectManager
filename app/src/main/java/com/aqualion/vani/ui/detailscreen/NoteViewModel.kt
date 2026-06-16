@@ -21,48 +21,78 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
+data class NoteUiState(
+    val id: Int = -1,
+    val name: String = "",
+    val value: String = "",
+    val projectId: Int = 0,
+    val createdAt: String = "",
+    val errorMessage: String? = null,
+    val isEdited: Boolean = false
+)
+
 @HiltViewModel
 class NoteViewModel @Inject constructor(
     private val getNoteUseCase: GetNoteUseCase,
     private val saveNotesUseCase: SaveNotesUseCase
 ): ViewModel() {
-    private val emptyNote = NoteUiModel(-1, "", "", 0, "", "")
-    private val _noteUiModel = MutableStateFlow(emptyNote)
-    val noteUiModel = _noteUiModel.asStateFlow()
 
-    private val _errorMessage = MutableStateFlow("")
-    val errorMessage = _errorMessage.asStateFlow()
+    private val _noteUiState = MutableStateFlow<NoteUiState>(NoteUiState())
+    val noteUiState = _noteUiState.asStateFlow()
+    fun onError(message: String) {
+        _noteUiState.update { it.copy(errorMessage = message) }
+        Log.d("NoteViewModel:OnError", "error: $message")
+    }
+    fun initError() {
+        _noteUiState.update { it.copy(errorMessage = null) }
+    }
     
     init {
         viewModelScope.launch {
-            runCatching {
-                if (_noteUiModel.value.id == emptyNote.id) throw IllegalArgumentException("Note id is not set")
-                getNoteUseCase.invoke(_noteUiModel.value.id).onSuccess {
-                    it.collect { note ->
-                        _noteUiModel.update {note.asUiState() }
-                        Log.d("NoteViewModel", "note: $note")
-                    }
-                    flow {
-                        while (true) {
-                            delay(60_000.milliseconds)
-                            emit(Unit)
-                        }
-                    }.onEach {
-                        if (_isEdited.value) {
-                            onSave()
-                            Log.d("NoteViewModel", "Auto-saved")
-                        }
-                    }.launchIn(viewModelScope)
-                }
-            }.onFailure {
-                _errorMessage.update { it }
-                Log.d("NoteViewModel", "error: $it")
-            }
+            init()
         }
     }
 
-    fun onInit(note: NoteUiModel) {
-        _noteUiModel.update { note }
+    @Throws(IllegalArgumentException::class)
+    private suspend fun init() = runCatching {
+        val id = _noteUiState.value.id
+        getNoteUseCase.invoke(id).onSuccess {
+            it.collect { note ->
+                _noteUiState.update { NoteUiState(
+                    id = note.id,
+                    name = note.name,
+                    value = note.value,
+                    projectId = note.projectId,
+                    createdAt = note.createdAt
+                ) }
+                Log.d("NoteViewModel", "note: $note")
+            }
+            setAutoSave()
+        }
+    }.onFailure { it ->
+        _noteUiState.update { it.copy(errorMessage = it.errorMessage) }
+        Log.d("NoteViewModel", "error: $it")
+    }
+
+    private fun setAutoSave() {
+        flow {
+            while (true) {
+                delay(60_000.milliseconds)
+                emit(Unit)
+            }
+        }.onEach {
+            if (_isEdited.value) {
+                onSave()
+                Log.d("NoteViewModel", "Auto-saved")
+            }
+        }.launchIn(viewModelScope)
+    }
+
+    fun onInit(noteId: Int) {
+        _noteUiState.update { NoteUiState(id = noteId) }
+        viewModelScope.launch {
+            init()
+        }
     }
 
     private val _isEdited = MutableStateFlow(false)
@@ -75,23 +105,25 @@ class NoteViewModel @Inject constructor(
     }
 
     fun onValueChange(value: String) {
-        _noteUiModel.value = _noteUiModel.value.copy(value = value)
+        _noteUiState.update {it.copy(value = value)}
         onEdited()
     }
 
     fun onNameChanged(name: String) {
-        _noteUiModel.value = _noteUiModel.value.copy(name = name)
+        _noteUiState.update {it.copy(name = name)}
         onEdited()
     }
 
+    // TODO: 離散的な保存。いずれ修正する
+
     fun onSave() {
+        val state = _noteUiState.value
         val note = Note(
-            id = _noteUiModel.value.id,
-            name = _noteUiModel.value.name,
-            value = _noteUiModel.value.value,
-            projectId = _noteUiModel.value.projectId,
-            createdAt = _noteUiModel.value.createdAt,
-            updatedAt = _noteUiModel.value.updatedAt
+            id = state.id,
+            name = state.name,
+            value = state.value,
+            projectId = state.projectId,
+            createdAt = state.createdAt,
         )
         viewModelScope.launch {
             saveNotesUseCase.invoke(listOf(note))
