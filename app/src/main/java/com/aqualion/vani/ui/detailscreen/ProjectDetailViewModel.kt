@@ -8,7 +8,9 @@ import com.aqualion.vani.domain.Note
 import com.aqualion.vani.domain.Project
 import com.aqualion.vani.domain.ProjectDetail
 import com.aqualion.vani.ui.NoteUiModel
+import com.aqualion.vani.ui.ProjectUiModel
 import com.aqualion.vani.ui.asUiState
+import com.aqualion.vani.usecase.CreateProjectUseCase
 import com.aqualion.vani.usecase.DeleteNotesUseCase
 import com.aqualion.vani.usecase.GetProjectDetailUseCase
 import com.aqualion.vani.usecase.SaveNotesUseCase
@@ -31,7 +33,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 enum class DialogPurpose {
     EDIT_NOTE,
-    DELETE_NOTE
+    DELETE_NOTE,
+    CREATE_ITEM
 }
 
 data class ProjectDetailUiState(
@@ -39,6 +42,7 @@ data class ProjectDetailUiState(
     val projectName: String = "",
     val projectCreatedAt: String = "",
     val notes: List<NoteUiModel> = emptyList(),
+    val subProjects: List<ProjectUiModel> = emptyList(),
     val newNote: NoteUiModel? = null,
     val isLoading: Boolean = false,
     val showDialog: DialogPurpose? = null,
@@ -51,6 +55,7 @@ class ProjectDetailViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val getProjectDetailUseCase: GetProjectDetailUseCase,
     private val saveProjectUseCase: SaveProjectUseCase,
+    private val createProjectUseCase: CreateProjectUseCase,
     private val saveNotesUseCase: SaveNotesUseCase,
     private val deleteNotesUseCase: DeleteNotesUseCase
 ): ViewModel() {
@@ -87,6 +92,7 @@ class ProjectDetailViewModel @Inject constructor(
                         projectName = if (current.isEdited) current.projectName else projectDetail.project.name,
                         projectCreatedAt = projectDetail.project.createdAt,
                         notes = projectDetail.notes.asUiState(),
+                        subProjects = projectDetail.subProjects.asUiState(),
                         isLoading = false
                     )
                 }
@@ -134,6 +140,25 @@ class ProjectDetailViewModel @Inject constructor(
     fun onRequestAddNewNote() {
         val newNote = NoteUiModel(name="", value="", projectId = _projectDetailUiState.value.projectId)
         _projectDetailUiState.update { it.copy(newNote = newNote) }
+    }
+
+    fun onRequestAddItem() {
+        _projectDetailUiState.update { it.copy(showDialog = DialogPurpose.CREATE_ITEM) }
+    }
+
+    fun onAddItem(name: String, isProject: Boolean) {
+        _projectDetailUiState.update { it.copy(showDialog = null) }
+        viewModelScope.launch {
+            if (isProject) {
+                createProjectUseCase(name, _projectDetailUiState.value.projectId)
+            } else {
+                saveNotesUseCase(
+                    listOf(
+                        Note(name = name, value = "", projectId = _projectDetailUiState.value.projectId)
+                    )
+                )
+            }
+        }
     }
 
     fun onChangedNewNoteName(name: String?) {
