@@ -32,4 +32,6 @@ interface ProjectRepository {
     suspend fun updateProjectDetail(projectDetail: ProjectDetail): Long
     fun getNote(id: Int): Flow<Note>
 
+    suspend fun addProjectRelation(parentId: Int, childId: Int): Long
+    suspend fun deleteProjectRelation(parentId: Int, childId: Int): Long
 }

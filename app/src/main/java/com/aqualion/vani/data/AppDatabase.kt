@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import android.content.Context
 
-@Database(entities = [ProjectEntity::class, NoteEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ProjectEntity::class, NoteEntity::class, ProjectRelationEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
 }
@@ -18,7 +18,7 @@ class AppDatabaseHelper(private val applicationContext: Context) {
                 applicationContext,
                 AppDatabase::class.java,
                 "app_database"
-            ).build()
+            ).fallbackToDestructiveMigration(false).build()
         }
         return database!!
     }

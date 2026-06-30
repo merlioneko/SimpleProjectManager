@@ -142,4 +142,16 @@ class ProjectRepositoryImpl @Inject constructor(
     override fun getNote(id: Int): Flow<Note> {
         return projectDao.getNote(id).map { it.toDomain() }
     }
+
+    override suspend fun addProjectRelation(parentId: Int, childId: Int): Long = withContext(Dispatchers.IO) {
+        appDatabase.withTransaction {
+            projectDao.insertRelation(ProjectRelationEntity(parentId, childId))
+        }
+    }
+
+    override suspend fun deleteProjectRelation(parentId: Int, childId: Int): Long = withContext(Dispatchers.IO) {
+        appDatabase.withTransaction {
+            projectDao.deleteRelation(parentId, childId).toLong()
+        }
+    }
 }

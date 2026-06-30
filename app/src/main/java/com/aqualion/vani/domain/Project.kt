@@ -69,20 +69,23 @@ fun NoteEntity.toDomain(): Note {
 
 data class ProjectDetail(
     val project: Project,
-    val notes: List<Note>
+    val notes: List<Note>,
+    val subProjects: List<Project> = emptyList()
 ) {
 }
 
 fun ProjectDetail.toEntity(): ProjectDetailEntity {
     return ProjectDetailEntity(
         projectEntity = this.project.toEntity(),
-        noteEntities = this.notes.map { it.toEntity() }
+        noteEntities = this.notes.map { it.toEntity() },
+        subProjectEntities = this.subProjects.map { it.toEntity() }
     )
 }
 
 fun ProjectDetailEntity.toDomain(): ProjectDetail {
     return ProjectDetail(
         project = this.projectEntity.toDomain(),
-        notes = this.noteEntities.map { it.toDomain() }
+        notes = this.noteEntities.map { it.toDomain() },
+        subProjects = this.subProjectEntities.map { it.toDomain() }
     )
 }

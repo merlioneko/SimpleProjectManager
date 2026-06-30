@@ -29,6 +29,30 @@ data class ProjectEntity(
     @ColumnInfo(name= "updated_at", defaultValue = "CURRENT_TIMESTAMP") val updatedAt: String
 )
 
+@Entity(
+    tableName = "project_relation",
+    primaryKeys = ["parent_id", "child_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["parent_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["child_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [androidx.room.Index("parent_id"), androidx.room.Index("child_id")]
+)
+data class ProjectRelationEntity(
+    @ColumnInfo(name = "parent_id") val parentId: Int,
+    @ColumnInfo(name = "child_id") val childId: Int
+)
+
 @Entity(tableName="note"
     ,foreignKeys = [
     ForeignKey(
@@ -52,7 +76,16 @@ data class ProjectDetailEntity(
     @Relation(
         parentColumn = "id",
         entityColumn = "project_id"
-    ) val noteEntities: List<NoteEntity>
+    ) val noteEntities: List<NoteEntity>,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = androidx.room.Junction(
+            value = ProjectRelationEntity::class,
+            parentColumn = "parent_id",
+            entityColumn = "child_id"
+        )
+    ) val subProjectEntities: List<ProjectEntity>
 )
 
 @Dao
@@ -73,6 +106,12 @@ interface ProjectDao {
     suspend fun update(projectEntity: ProjectEntity): Int
     @Update
     suspend fun update(noteEntity: NoteEntity): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertRelation(relation: ProjectRelationEntity): Long
+
+    @Query("DELETE FROM project_relation WHERE parent_id = :parentId AND child_id = :childId")
+    suspend fun deleteRelation(parentId: Int, childId: Int): Int
 
 
     @Transaction
