@@ -50,20 +50,28 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aqualion.vani.ui.NoteUiModel
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.RadioButton
+import com.aqualion.vani.ui.ProjectUiModel
 import com.aqualion.vani.ui.theme.VaniTheme
 import kotlinx.coroutines.launch
 import kotlin.collections.forEach
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 
 @Composable
-fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
+fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel(),
+                        onProjectSelected: (ProjectUiModel) -> Unit = {}) {
     val uiState by viewModel.projectDetailUiState.collectAsStateWithLifecycle()
     ProjectDetailContent(
         uiState = uiState,
-        onNewNoteRequired = viewModel::onRequestAddNewNote,
-        onNewNoteNameChanged = viewModel::onChangedNewNoteName,
-        onAddNote = viewModel::onAddNote,
+        onAddItemRequested = viewModel::onRequestAddItem,
         onProjectNameEdited = viewModel::onProjectNameChanged,
         onNoteSelected = viewModel::onNoteSelected,
+        onProjectSelected = onProjectSelected,
         onLongPress = viewModel::onRequestDeleteNote
     )
 
@@ -85,6 +93,10 @@ fun ProjectDetailScreen(viewModel: ProjectDetailViewModel = hiltViewModel()) {
         )
         DialogPurpose.DELETE_NOTE -> DeleteNoteDialog(
             onConfirm = { viewModel.onDeleteNote(selectedNote!!) },
+            onDismiss = viewModel::onDismissDialog
+        )
+        DialogPurpose.CREATE_ITEM -> AddItemDialog(
+            onConfirm = { name, isProject -> viewModel.onAddItem(name, isProject) },
             onDismiss = viewModel::onDismissDialog
         )
         else -> {}
@@ -142,30 +154,43 @@ fun NameTopAppBar(modifier: Modifier = Modifier,
 // TODO: このバケツリレーはたぶん適宜ViewModelを用意したりしたらいい気はする
 @Composable
 fun ProjectDetailContent(uiState: ProjectDetailUiState,
-                         onNewNoteRequired: () -> Unit = {},
-                         onNewNoteNameChanged: (String?) -> Unit = {},
-                         onAddNote: (String) -> Unit = {},
+                         onAddItemRequested: () -> Unit = {},
                          onProjectNameEdited: (String) -> Unit = {},
                          onNoteSelected: (NoteUiModel) -> Unit = {},
+                         onProjectSelected: (ProjectUiModel) -> Unit = {},
                          onLongPress: (NoteUiModel) -> Unit = {}) {
     Scaffold(
         modifier=Modifier.fillMaxWidth(),
         topBar = { NameTopAppBar(name = uiState.projectName, onNameEdited = onProjectNameEdited) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { onNewNoteRequired() }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Note")
+                onClick = { onAddItemRequested() }) {
+                Icon(Icons.Filled.Add, contentDescription = "Add Item")
             }
         }
     ) {innerPadding ->
-        Column(modifier=Modifier.padding(innerPadding)) {
+        Column(modifier=Modifier.padding(innerPadding).verticalScroll(rememberScrollState())) {
+            uiState.subProjects.forEach { SubProjectItem(project = it, onProjectSelected = onProjectSelected) }
             uiState.notes.forEach { NoteItem(note = it, onLongPress=onLongPress, onNoteSelected=onNoteSelected) }
-            when (uiState.newNote) {
-                null -> {}
-                else -> {
-                    NewNoteItem(modifier=Modifier, note = uiState.newNote, onValueChange = onNewNoteNameChanged, onAddNote = onAddNote)
-                }
-            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SubProjectItem(modifier: Modifier = Modifier,
+                   project: ProjectUiModel,
+                   onProjectSelected: (ProjectUiModel) -> Unit = {}) {
+    Card(modifier = modifier.fillMaxWidth()
+        .padding(8.dp)
+        .requiredHeight(60.dp)
+        .clickable { onProjectSelected(project) }
+    ) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(modifier = Modifier.weight(1f),
+                text = "[Project] ${project.name}",
+                style = TextStyle(fontSize = 18.sp))
         }
     }
 }
@@ -230,6 +255,58 @@ fun NoteItem(modifier: Modifier = Modifier,
                 overflow = TextOverflow.StartEllipsis)
         }
     }
+}
+
+@Composable
+fun AddItemDialog(onConfirm: (String, Boolean) -> Unit, onDismiss: () -> Unit) {
+    val name = remember { mutableStateOf("") }
+    val isProject = remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create New Item") },
+        text = {
+            Column {
+                TextField(
+                    value = name.value,
+                    onValueChange = { name.value = it },
+                    placeholder = { Text("Enter name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = !isProject.value,
+                        onClick = { isProject.value = false }
+                    )
+                    Text("Note", modifier = Modifier.clickable { isProject.value = false })
+                    Spacer(modifier = Modifier.width(16.dp))
+                    RadioButton(
+                        selected = isProject.value,
+                        onClick = { isProject.value = true }
+                    )
+                    Text("Project", modifier = Modifier.clickable { isProject.value = true })
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.value.isNotBlank()) {
+                        onConfirm(name.value, isProject.value)
+                    }
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

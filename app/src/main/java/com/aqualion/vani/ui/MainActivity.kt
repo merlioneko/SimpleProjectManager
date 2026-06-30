@@ -77,7 +77,9 @@ fun MainScreen() {
                 } + fadeOut()
             }
         ) {
-            ProjectDetailScreen()
+            ProjectDetailScreen(onProjectSelected = { project ->
+                navController.navigate("${Screen.PROJECT_DETAIL.name}/${project.id}")
+            })
         }
     }
 }
